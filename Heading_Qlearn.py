@@ -51,11 +51,8 @@ for v in range(len(vel_space)):
         for o in range(len(omega_space)):
             states.append((v,h,o))
 
-x_data = []; y_data = []; xvel_data = []; time_now = []; heading_data = []; omega_data = []; yvel_data = []
-action_taken = []
-
-velocity = []; yaw = []; yaw_dot = []; track_reward = []
-velocity_reward = []; heading_reward = []; omega_reward = []; action_reward = []
+x_data = []; y_data = []; xvel_data = []; yvel_data = []; time_now = []; heading_data = []; omega_data = [] 
+action_taken = []; track_reward = []
 
 def get_obs(pipe):
     # Wait for the next set of frames from the camera
@@ -106,53 +103,36 @@ def get_act(state):
 
 def get_reward(state_n, act):
     (xvel, heading, omega) = state_n
-    xvel_reward = xvel * vel_factor
     if abs(heading) < ang_lim:
         heading_reward = (ang_lim - abs(heading)) * heading_factor
     else:
         heading_reward = neg_reward
-    if act == motor_stop:
-        action_reward = 0.5
-    elif act < motor_stop:
-        action_reward = -abs(act - motor_stop)
-        action_reward = action_reward * action_ratio
-    else:
-        action_reward = -abs(act - motor_stop)
     return heading_reward
 
-def export_data(episode, time_now, xvel_data, yvel_data, heading_data, omega_data, action_taken, heading_reward):
-    wb = xl.Workbook("Episode: " + str(episode) + dt.now().strftime("%Y_%m_%d_%H_%M_%S"))
+def export_data(episode, time_now, xvel_data, yvel_data, heading_data, heading_reward, omega_data, action_taken):
+    wb = xl.Workbook('/home/pi/Zlawren1_Swimbot/Logs/Episode:' + str(episode) + dt.now().strftime("%Y_%m_%d_%H_%M_%S") + '.xlsx')
     ws = wb.add_worksheet("Logged data")
     ws.write(0, 0, "Time Stamp")
-    ws.write(0, 1, "Velocity [m/s]")
-    ws.write(0, 2, "Velocity Reward")
+    ws.write(0, 1, "X Velocity [m/s]")
+    ws.write(0, 2, "Y Velocity [m/s]")
     ws.write(0, 3, "Heading [Deg]")
-    ws.write(0, 4, "Heading Reward")
+    ws.write(0, 4, "Heading Rewards")
     ws.write(0, 5, "Omega [rad/s]")
-    ws.write(0, 6, "Omega Reward")
-    ws.write(0, 7, "Action")
-    ws.write(0, 8, "Action Reward")
-    ws.write(0, 9, "Reward Sum")
+    ws.write(0, 6, "Action")
     for i, time in enumerate(time_now):
         ws.write(i+1, 0, time)
-    for i, vel in enumerate(xvel_data):
-        ws.write(i+1, 1, vel)
-    for i, vel_rew in enumerate(yvel_data):
-        ws.write(i+1, 2, vel_rew)
+    for i, xvel in enumerate(xvel_data):
+        ws.write(i+1, 1, xvel)
+    for i, yvel in enumerate(yvel_data):
+        ws.write(i+1, 2, yvel)
     for i, head in enumerate(heading_data):
         ws.write(i+1, 3, head)
     for i, head_rew in enumerate(heading_reward):
         ws.write(i+1, 4, head_rew)
     for i, ome in enumerate(omega_data):
         ws.write(i+1, 5, ome)
-    for i, ome_rew in enumerate(omega_reward):
-        ws.write(i+1, 6, ome_rew)
     for i, act in enumerate(action_taken):
-        ws.write(i+1, 7, act)
-    for i, act_rew in enumerate(action_reward):
-        ws.write(i+1, 8, act_rew)
-    for i, rew in enumerate(track_reward):
-        ws.write(i+1, 9, rew)
+        ws.write(i+1, 6, act)
     wb.close()
 
 servo = ServoKit(channels = channel).continuous_servo[0]
@@ -175,6 +155,7 @@ total_reward = np.zeros(episodes)
 for e in range(episodes):
     act = motor_stop
     servo.throttle = act
+    action_taken.append(act)
     ep_reward = 0
     pipe = rs.pipeline()
     # Build config object and request pose data
@@ -188,12 +169,6 @@ for e in range(episodes):
     print('Starting Episode: ' + str(e))
     xvel, heading, omega = get_obs(pipe)
     for i in range(iterations):
-        # if sym == False:
-        #     state = get_state(xvel, heading, omega)
-        # if sym == True:
-        #     sym_states = get_state(xvel, heading, omega)
-        #     state = (sym_states[0], sym_states[1], sym_states[2])
-        #     sym_state = (sym_states[0], sym_states[3], sym_states[4])
         state = get_state(xvel, heading, omega)
         compare = np.random.random()
         if compare > epsilon:
@@ -202,25 +177,14 @@ for e in range(episodes):
             rand = np.random.randint(low= 0, high= len(actions))
             act = actions[rand]
         servo.throttle = act
+        action_taken.append(act)
         time.sleep(time_step)
         xvel_n, heading_n, omega_n = get_obs(pipe)
-        # if sym == False:
-        #     state_n = get_state(xvel_n, heading_n, omega_n)
-        # if sym == True:
-        #     sym_states_n = get_state(xvel_n, heading_n, omega_n)
-        #     state_n = (sym_states_n[0], sym_states_n[1], sym_states_n[2])
-        #     sym_state_n = (sym_states_n[0], sym_states_n[3], sym_states_n[4])
         state_n = get_state(xvel_n, heading_n, omega_n)
-        rewards = get_reward(state_n, act)
-        reward = rewards[0]
-        track_reward.append(rewards[0]); velocity_reward.append(rewards[1]); heading_reward.append(rewards[2]); omega_reward.append(rewards[3]); action_reward.append(rewards[4])
+        reward = get_reward(state_n, act)
+        track_reward.append(reward)
         ep_reward += reward
         act_n = get_act(state_n)
-        # if sym == False:
-        #     q_value[state, act] = q_value[state, act] + alpha * (reward + gamma * q_value[state_n, act_n] - q_value[state, act])
-        # if sym == True:
-        #     q_value[state, act] = q_value[state, act] + alpha * (reward + gamma * q_value[state_n, act_n] - q_value[state, act])
-        #     q_value[sym_state, -act] = q_value[sym_state, -act] + alpha * (reward + gamma * q_value[sym_state_n, -act_n] - q_value[sym_state, -act])
         q_value[(state, act)] = q_value[(state, act)] + alpha * (reward + gamma * q_value[(state_n, act_n)] - q_value[(state, act)])
         xvel, heading, omega = xvel_n, heading_n, omega_n
     if epsilon > 2 / episodes:
@@ -230,12 +194,9 @@ for e in range(episodes):
     servo.throttle = motor_stop
     total_reward[e] = ep_reward
     pipe.stop()
-    export_data(e, time_now, velocity, yaw, yaw_dot, action_taken, velocity_reward, heading_reward, omega_reward, action_reward, track_reward)
+    heading_reward = track_reward
+    export_data(e, time_now, xvel_data, heading_data, omega_data, action_taken, heading_reward, track_reward)
     time_stamp = dt.now().strftime("%H_%M_%S")
-    # if sym == False:
-    #     file_loc = open('D:/UNCC/Research/Summer 23/Q_Tables/qtable_' + time_stamp + 'episode:' + str(e) + 'no_symmetry.file', 'wb')
-    # if sym == True:
-    #     file_loc = open('D:/UNCC/Research/Summer 23/Q_Tables/qtable_' + time_stamp + 'episode:' + str(e) + 'symmetry.file', 'wb')
-    file_loc = open('/home/pi/OUR2022Research/onPi/qtable_' + time_stamp + 'episode:' + str(e) + '.file', 'wb')
+    file_loc = open('/home/pi/Zlawren1_Swimbot/Q_Tables/' + time_stamp + 'episode:' + str(e) + '.file', 'wb')
     pickle.dump(q_value, file_loc)
     file_loc.close()
