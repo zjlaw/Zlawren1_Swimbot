@@ -44,6 +44,7 @@ neg_reward = -5
 channel = 16
 time_step = 0.5
 startup = 10
+colors = np.linspace(0, iterations, iterations + 1)
 
 states = []
 for v in range(len(vel_space)):
@@ -121,10 +122,10 @@ def export_data(episode, time_now, xvel_data, yvel_data, heading_data, heading_r
     ws.write(0, 6, "Action")
     for i, time in enumerate(time_now):
         ws.write(i+1, 0, time)
-    for i, xvel in enumerate(xvel_data):
-        ws.write(i+1, 1, xvel)
-    for i, yvel in enumerate(yvel_data):
-        ws.write(i+1, 2, yvel)
+    for i, x_vel in enumerate(xvel_data):
+        ws.write(i+1, 1, x_vel)
+    for i, y_vel in enumerate(yvel_data):
+        ws.write(i+1, 2, y_vel)
     for i, head in enumerate(heading_data):
         ws.write(i+1, 3, head)
     for i, head_rew in enumerate(heading_reward):
@@ -138,7 +139,7 @@ def export_data(episode, time_now, xvel_data, yvel_data, heading_data, heading_r
 servo = ServoKit(channels = channel).continuous_servo[0]
 servo.throttle = motor_stop
 
-print("Do you want to load a Q-Table or create a new one, y/n? ")
+print("Do you want to load a Q-Table y/n? ")
 if input() == 'y':
     print("What file path should I follow to find your Q-Table?")
     q_file = open(input(), 'rb')
@@ -193,10 +194,19 @@ for e in range(episodes):
         epsilon = 0  
     servo.throttle = motor_stop
     total_reward[e] = ep_reward
+    plt.scatter(x_data, y_data, c = colors, cmap = 'plasma', alpha= .7, edgecolors= 'black')
+    plt.xlabel('X position [m]')
+    plt.ylabel('Y position [m]')
+    plt.title('Postion over time')
+    plt.grid(True)
+    cbar = plt.colorbar()
+    cbar.set_label('Time Progression')    
     pipe.stop()
     heading_reward = track_reward
     export_data(e, time_now, xvel_data, heading_data, omega_data, action_taken, heading_reward, track_reward)
-    time_stamp = dt.now().strftime("%H_%M_%S")
+    time_stamp = dt.now().strftime("%Y_%m_%d_%H_%M_%S")
+    plt.savefig('/home/pi/Zlawren1_Swimbot/Plots/' + time_stamp + 'episode:' + str(e) + '.png')
+    plt.show()
     file_loc = open('/home/pi/Zlawren1_Swimbot/Q_Tables/' + time_stamp + 'episode:' + str(e) + '.file', 'wb')
     pickle.dump(q_value, file_loc)
     file_loc.close()
