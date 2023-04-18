@@ -4,7 +4,7 @@ import time
 from datetime import datetime as dt
 import matplotlib.pyplot as plt
 
-iterations = 50
+iterations = 20
 colors = np.linspace(0, iterations, iterations)
 x_data = []; y_data = []
 
