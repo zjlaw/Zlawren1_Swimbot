@@ -43,8 +43,9 @@ action_ratio = abs(actions[len(actions) - 1] - motor_stop) / abs(actions[0] - mo
 neg_reward = -5
 channel = 16
 time_step = 0.5
-startup = 10
+startup = 5
 colors = np.linspace(0, iterations, iterations + 1)
+pause = 20
 
 states = []
 for v in range(len(vel_space)):
@@ -72,10 +73,10 @@ def get_obs(pipe):
         # pitch = -np.arcsin(2.0 * (x * z - w * y)) * 180 / (np.pi)
         # roll  =  np.arctan2(2.0 * (w*x + y*z), w*w - x*x - y*y + z*z) * 180.0 / (np.pi)
         heading   =  np.arctan2(2.0 * (w*z + x*y), w*w + x*x - y*y - z*z) * 180.0 / (np.pi)
-        x_pos = -data.translation.x
-        y_pos = data.translation.y
-        xvel = -data.velocity.x
-        yvel = data.velocity.y
+        x_pos = data.translation.z
+        y_pos = data.translation.x
+        xvel = data.velocity.z
+        yvel = data.velocity.x
         omega = data.angular_velocity.y
         print('X position: {0:.7f}, Y position: {1:.7f}'.format(x_pos, y_pos))
         # print("Frame #{}".format(pose.frame_number))
@@ -161,7 +162,24 @@ for e in range(episodes):
     pipe = rs.pipeline()
     # Build config object and request pose data
     cfg = rs.config()
-    cfg.enable_stream(rs.stream.pose)
+    profile = cfg.resolve(pipe)
+    dev = profile.get_device()
+    tm2 = dev.as_tm2()
+
+    if(tm2):
+        # tm2.first_wheel_odometer()?
+        pose_sensor = tm2.first_pose_sensor()
+        wheel_odometer = pose_sensor.as_wheel_odometer()
+
+        # calibration to list of uint8
+        f = open("/home/pi/Zlawren1_Swimbot/calibration_odometry.json")
+        chars = []
+        for line in f:
+            for c in line:
+                chars.append(ord(c))  # char to uint8
+
+        # load/configure wheel odometer
+        wheel_odometer.load_wheel_odometery_config(chars)
 
     # Start streaming with requested config
     pipe.start(cfg)
@@ -201,12 +219,18 @@ for e in range(episodes):
     plt.grid(True)
     cbar = plt.colorbar()
     cbar.set_label('Time Progression')    
-    pipe.stop()
     heading_reward = track_reward
     export_data(e, time_now, xvel_data, heading_data, omega_data, action_taken, heading_reward, track_reward)
     time_stamp = dt.now().strftime("%Y_%m_%d_%H_%M_%S")
-    plt.savefig('/home/pi/Zlawren1_Swimbot/Plots/' + time_stamp + 'episode:' + str(e) + '.png')
+    plt.savefig('/home/pi/Zlawren1_Swimbot/Plots/_' + time_stamp + 'episode:' + str(e) + '.png')
     plt.show()
     file_loc = open('/home/pi/Zlawren1_Swimbot/Q_Tables/' + time_stamp + 'episode:' + str(e) + '.file', 'wb')
     pickle.dump(q_value, file_loc)
     file_loc.close()
+    print('Are you ready for the next episode: y/n?')
+    if input() == 'y':
+        pass
+    else:
+        print('You have 20 seconds before the next episode begins')
+        time.sleep(pause)
+pipe.stop()
