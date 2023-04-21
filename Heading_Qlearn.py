@@ -22,7 +22,7 @@ motor_stop = .15
 stop_index = 6
 motor_ccw = -1
 action_step = 13
-episodes = 5
+episodes = 20
 iterations = 50
 interval = .5
 ang_lim = 21
@@ -53,8 +53,6 @@ for v in range(len(vel_space)):
         for o in range(len(omega_space)):
             states.append((v,h,o))
 
-x_data = []; y_data = []; xvel_data = []; yvel_data = []; time_now = []; heading_data = []; omega_data = [] 
-action_taken = []; track_reward = []
 
 def get_obs(pipe):
     # Wait for the next set of frames from the camera
@@ -112,7 +110,7 @@ def get_reward(state_n, act):
     return heading_reward
 
 def export_data(episode, time_now, xvel_data, yvel_data, heading_data, heading_reward, omega_data, action_taken):
-    wb = xl.Workbook('/home/pi/Zlawren1_Swimbot/Logs/Episode:' + str(episode) + dt.now().strftime("%Y_%m_%d_%H_%M_%S") + '.xlsx')
+    wb = xl.Workbook('/home/pi/Zlawren1_Swimbot/Logs/Episode:_' + str(episode) + '_' + dt.now().strftime("%Y_%m_%d_%H_%M_%S") + '.xlsx')
     ws = wb.add_worksheet("Logged data")
     ws.write(0, 0, "Time Stamp")
     ws.write(0, 1, "X Velocity [m/s]")
@@ -154,37 +152,44 @@ else:
             q_value[(state, act)] = np.random.random()    
 total_reward = np.zeros(episodes)
 
+pipe = rs.pipeline()
+# Build config object and request pose data
+cfg = rs.config()
+profile = cfg.resolve(pipe)
+dev = profile.get_device()
+tm2 = dev.as_tm2()
+
+if(tm2):
+    # tm2.first_wheel_odometer()?
+    pose_sensor = tm2.first_pose_sensor()
+    wheel_odometer = pose_sensor.as_wheel_odometer()
+
+    # calibration to list of uint8
+    f = open("/home/pi/Zlawren1_Swimbot/calibration_odometry.json")
+    chars = []
+    for line in f:
+        for c in line:
+            chars.append(ord(c))  # char to uint8
+
+    # load/configure wheel odometer
+    wheel_odometer.load_wheel_odometery_config(chars)
+
+print("Realsense initializing.")
+time.sleep(startup)
+
+# Start streaming with requested config
+pipe.start(cfg)
+
+
 for e in range(episodes):
+
+    x_data = []; y_data = []; xvel_data = []; yvel_data = []; time_now = []; heading_data = []; omega_data = [] 
+    action_taken = []; track_reward = []
+
     act = motor_stop
     servo.throttle = act
     action_taken.append(act)
     ep_reward = 0
-    pipe = rs.pipeline()
-    # Build config object and request pose data
-    cfg = rs.config()
-    profile = cfg.resolve(pipe)
-    dev = profile.get_device()
-    tm2 = dev.as_tm2()
-
-    if(tm2):
-        # tm2.first_wheel_odometer()?
-        pose_sensor = tm2.first_pose_sensor()
-        wheel_odometer = pose_sensor.as_wheel_odometer()
-
-        # calibration to list of uint8
-        f = open("/home/pi/Zlawren1_Swimbot/calibration_odometry.json")
-        chars = []
-        for line in f:
-            for c in line:
-                chars.append(ord(c))  # char to uint8
-
-        # load/configure wheel odometer
-        wheel_odometer.load_wheel_odometery_config(chars)
-
-    # Start streaming with requested config
-    pipe.start(cfg)
-    print("Realsense initializing.")
-    time.sleep(startup)
     print('Starting Episode: ' + str(e))
     xvel, heading, omega = get_obs(pipe)
     for i in range(iterations):
@@ -209,22 +214,26 @@ for e in range(episodes):
     if epsilon > 2 / episodes:
         epsilon -= 2 / episodes
     else:
-        epsilon = 0  
+        epsilon = 0
+
+    time_stamp = dt.now().strftime("%Y_%m_%d_%H_%M_%S")
     servo.throttle = motor_stop
     total_reward[e] = ep_reward
+
     plt.scatter(x_data, y_data, c = colors, cmap = 'plasma', alpha= .7, edgecolors= 'black')
     plt.xlabel('X position [m]')
     plt.ylabel('Y position [m]')
     plt.title('Postion over time')
     plt.grid(True)
     cbar = plt.colorbar()
-    cbar.set_label('Time Progression')    
+    cbar.set_label('Time Progression')
+    plt.savefig('/home/pi/Zlawren1_Swimbot/Plots/' + time_stamp + 'episode:' + str(e) + '.png')
+    plt.close()
+
     heading_reward = track_reward
     export_data(e, time_now, xvel_data, heading_data, omega_data, action_taken, heading_reward, track_reward)
-    time_stamp = dt.now().strftime("%Y_%m_%d_%H_%M_%S")
-    plt.savefig('/home/pi/Zlawren1_Swimbot/Plots/_' + time_stamp + 'episode:' + str(e) + '.png')
-    plt.show()
-    file_loc = open('/home/pi/Zlawren1_Swimbot/Q_Tables/' + time_stamp + 'episode:' + str(e) + '.file', 'wb')
+    
+    file_loc = open('/home/pi/Zlawren1_Swimbot/Q_Tables/' + time_stamp + '_episode:' + str(e) + '.file', 'wb')
     pickle.dump(q_value, file_loc)
     file_loc.close()
     print('Are you ready for the next episode: y/n?')
@@ -233,4 +242,5 @@ for e in range(episodes):
     else:
         print('You have 20 seconds before the next episode begins')
         time.sleep(pause)
+    
 pipe.stop()
