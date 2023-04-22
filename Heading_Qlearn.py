@@ -20,7 +20,7 @@ motor_stop = .15
 stop_index = 6
 motor_ccw = -1
 action_step = 13
-episodes = 20
+episodes = 17
 iterations = 50
 interval = .5
 ang_lim = 21
@@ -242,14 +242,13 @@ for e in range(episodes):
 
     heading_reward = track_reward
     export_data(e, time_now, x_data, xvel_data, y_data, yvel_data, heading_data, heading_reward, omega_data, action_taken)
-    if i % output == 0:
-        file_loc = open('/home/pi/Zlawren1_Swimbot/Q_Tables/' + time_stamp + '_episode:' + str(e) + '.file', 'wb')
-        pickle.dump(q_value, file_loc)
-        file_loc.close()
-    
-        e_loc = open('Epsilon/' + time_stamp + '_episode:' + str(e) + '.file', 'wb')
-        pickle.dump(epsilon, e_loc)
-        e_loc.close()
+    file_loc = open('/home/pi/Zlawren1_Swimbot/Q_Tables/' + time_stamp + '_episode:' + str(e) + '.file', 'wb')
+    pickle.dump(q_value, file_loc)
+    file_loc.close()
+
+    e_loc = open('/home/pi/Zlawren1_Swimbot/Epsilon/' + time_stamp + '_episode:' + str(e) + '.file', 'wb')
+    pickle.dump(epsilon, e_loc)
+    e_loc.close()
     print('Are you ready for the next episode: y/n?')
     if input() == 'y':
         pass
