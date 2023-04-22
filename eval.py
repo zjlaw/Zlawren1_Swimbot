@@ -93,7 +93,7 @@ def get_reward(state_n, act):
         heading_reward = neg_reward
     return heading_reward
 
-def export_data(time_now, x_data, xvel_data, y_data, yvel_data, heading_data, omega_data, action_taken, ep_reward):
+def export_data(time_now, x_data, xvel_data, y_data, yvel_data, heading_data, omega_data, action_taken, track_reward):
     wb = xl.Workbook('/home/pi/Zlawren1_Swimbot/Logs/Progress_Report_' + dt.now().strftime("%Y_%m_%d_%H_%M_%S") + '.xlsx')
     ws = wb.add_worksheet("Logged data")
     ws.write(0, 0, "Time Stamp")
@@ -121,7 +121,7 @@ def export_data(time_now, x_data, xvel_data, y_data, yvel_data, heading_data, om
         ws.write(i+1, 6, ome)
     for i, act in enumerate(action_taken):
         ws.write(i+1, 7, act)
-    for i, rew in enumerate(ep_reward):
+    for i, rew in enumerate(track_reward):
         ws.write(i+1, 6, rew)
     wb.close()
 
@@ -195,5 +195,5 @@ time_stamp = dt.now().strftime("%Y_%m_%d_%H_%M_%S")
 plt.savefig('/home/pi/Zlawren1_Swimbot/Plots/' + time_stamp + 'Progress_Report' + '.png')
 plt.close()
 
-export_data(time_now, x_data, xvel_data, y_data, yvel_data, heading_data, omega_data, action_taken, ep_reward)
+export_data(time_now, x_data, xvel_data, y_data, yvel_data, heading_data, omega_data, action_taken, track_reward)
 pipe.stop()
