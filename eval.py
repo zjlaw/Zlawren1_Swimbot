@@ -122,7 +122,7 @@ def export_data(time_now, x_data, xvel_data, y_data, yvel_data, heading_data, om
     for i, act in enumerate(action_taken):
         ws.write(i+1, 7, act)
     for i, rew in enumerate(track_reward):
-        ws.write(i+1, 6, rew)
+        ws.write(i+1, 8, rew)
     wb.close()
 
 servo = ServoKit(channels = channel).continuous_servo[0]
