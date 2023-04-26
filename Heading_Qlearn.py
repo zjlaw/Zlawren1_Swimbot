@@ -33,7 +33,8 @@ heading_space = np.linspace(neg_ang, pos_ang, steps)
 omega_space = np.linspace(neg_omega, pos_omega, steps)
 actions = (-1, -0.81, -.62, -0.43, -0.23, -0.04, 0.15, 0.29, 0.43, 0.58, 0.72, 0.86, 1)
 vel_factor = 5
-heading_factor = .067
+pos_heading_factor = 0.24
+neg_heading_factor = 0.067
 omega_factor = .25
 action_factor = .1
 action_ratio = abs(actions[len(actions) - 1] - motor_stop) / abs(actions[0] - motor_stop)
@@ -97,9 +98,9 @@ def get_act(state):
 def get_reward(state_n, act):
     (xvel, heading, omega) = state_n
     if abs(heading) < ang_lim:
-        heading_reward = (ang_lim - abs(heading)) * heading_factor
+        heading_reward = (ang_lim - abs(heading)) * pos_heading_factor
     else:
-        heading_reward = neg_reward
+        heading_reward = (ang_lim - abs(heading)) * neg_heading_factor
     return heading_reward
 
 def export_data(episode, time_now, x_data, xvel_data, y_data, yvel_data, heading_data, heading_reward, omega_data, action_taken):
