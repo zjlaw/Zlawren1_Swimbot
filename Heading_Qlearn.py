@@ -20,7 +20,7 @@ motor_stop = .15
 stop_index = 6
 motor_ccw = -1
 action_step = 13
-episodes = 20
+episodes = 1
 iterations = 50
 interval = .5
 ang_lim = 21
@@ -47,10 +47,8 @@ output = 5
 pause = 20
 
 states = []
-for v in range(len(vel_space)):
-    for h in range(len(heading_space)):
-        for o in range(len(omega_space)):
-            states.append((v,h,o))
+for h in range(len(heading_space)):
+            states.append(h)
 
 def get_obs(pipe):
     # Wait for the next set of frames from the camera
@@ -81,13 +79,11 @@ def get_obs(pipe):
         time_now.append(dt.now().strftime("%Y_%m_%d_%H_%M_%S"))
         heading_data.append(heading)
         omega_data.append(omega)
-    return xvel, heading, omega
+    return heading
 
-def get_state(xvel,heading, omega):
-    xvel = int(np.digitize(xvel, vel_space)) - 1
+def get_state(heading):
     heading = int(np.digitize(heading, heading_space)) - 1
-    omega = int(np.digitize(omega, omega_space)) - 1
-    return xvel, heading, omega
+    return heading
 
 def get_act(state):
     possibilities = np.array([q_value[(state, a)] for a in actions])
@@ -95,8 +91,7 @@ def get_act(state):
     act = actions[index]
     return act
 
-def get_reward(state_n, act):
-    (xvel, heading, omega) = state_n
+def get_reward(heading, act):
     if abs(heading) < ang_lim:
         heading_reward = (ang_lim - abs(heading)) * pos_heading_factor
     else:
@@ -202,9 +197,9 @@ for e in range(episodes):
     action_taken.append(act)
     ep_reward = 0
     print('Starting Episode: ' + str(e))
-    xvel, heading, omega = get_obs(pipe)
+    heading = get_obs(pipe)
     for i in range(iterations):
-        state = get_state(xvel, heading, omega)
+        state = get_state(heading)
         compare = np.random.random()
         if compare > epsilon:
             act = get_act(state)
@@ -214,14 +209,14 @@ for e in range(episodes):
         servo.throttle = act
         action_taken.append(act)
         time.sleep(time_step)
-        xvel_n, heading_n, omega_n = get_obs(pipe)
-        state_n = get_state(xvel_n, heading_n, omega_n)
+        heading_n = get_obs(pipe)
+        state_n = get_state(heading_n)
         reward = get_reward(state_n, act)
         track_reward.append(reward)
         ep_reward += reward
         act_n = get_act(state_n)
         q_value[(state, act)] = q_value[(state, act)] + alpha * (reward + gamma * q_value[(state_n, act_n)] - q_value[(state, act)])
-        xvel, heading, omega = xvel_n, heading_n, omega_n
+        heading = heading_n
     if epsilon - 2 / epsilon_decay > 0:
         epsilon -= 2 / epsilon_decay
     else:
@@ -251,11 +246,14 @@ for e in range(episodes):
         e_loc = open('/home/pi/Zlawren1_Swimbot/Epsilon/' + time_stamp + '_episode:' + str(e) + '.file', 'wb')
         pickle.dump(epsilon, e_loc)
         e_loc.close()
-    print('Are you ready for the next episode: y/n?')
-    if input() == 'y':
-        pass
+    if(e+1 != episodes):
+        print('Are you ready for the next episode: y/n?')
+        if input() == 'y':
+            pass
+        else:
+            print('You have 20 seconds before the next episode begins')
+            time.sleep(pause)
     else:
-        print('You have 20 seconds before the next episode begins')
-        time.sleep(pause)
+        print('This session is complete.')
     
 pipe.stop()
